@@ -1,0 +1,92 @@
+# Partie 1
+# 1 — Importation et qualité des données
+
+## 1- Importer le fichier dans R. Indiquer le nombre d’observations, le nombre de variables et l’unité statistique. Présenter les cinq premières lignes sans divulguer d’informations personnelles.
+
+```{r}
+data <- read.table("Recensement.txt", header = TRUE, sep = "\t")
+dim(data)
+names(data)
+head(data, 5)
+```
+
+- **Nombre d'observations** : 599 individus.
+- **Nombre de variables** : 11 colonnes.
+- **Unité statistique** : Un travailleur / individu recensé.
+
+
+## 2. Identifier le type statistique de chaque variable (qualitative nominale, ordinale, quantitative discrète ou continue). Justifier les cas discutables, notamment NIV_ETUDES, CATEGORIE et REV_FOYER.
+
+### Classification des variables :
+
+- **AGE** : **Quantitative discrète** quantitative, mesurée en années entières.
+- **SEXE** : **Qualitative nominale** (binaire : `F`, `M`, pas d'ordre hiérarchique).
+- **REGION** : **Qualitative nominale** (4 zones géographiques : `NE`, `NW`, `S`, `W`, sans ordre naturel).
+- **STAT_MARI** : **Qualitative nominale** (modalités : `C`, `D`, `M`, `S`, `V`, sans hiérarchie).
+- **SAL_HOR** : **Quantitative continue**.
+- **SYNDICAT** : **Qualitative nominale** (dichotomique : `non`, `oui`).
+- **NB_PERS** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
+- **NB_ENF** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
+
+### Justification des cas discutables :
+
+1. **`CATEGORIE` (valeurs de 1 à 10)** :
+   - **Type : Qualitative nominale codée numériquement**.
+   - *Justification* : Les entiers de 1 à 10 représentent des catégories socioprofessionnelles ou secteurs d'emploi. Il n'existe aucune relation d'ordre mathématique ou hiérarchique entre eux (la catégorie 4 n'est pas le « double » de la catégorie 2). Calculer une moyenne ou une somme sur cette variable n'a aucun sens statistique. Le fait que R l'enregistre comme `integer` est uniquement un format de stockage.
+
+2. **`NIV_ETUDES` (valeurs de 32 à 46)** :
+   - **Type : Qualitative ordinale codée numériquement**.
+   - *Justification* : Ces codes correspondent aux paliers de diplômes obtenus (classification standard du recensement/CPS). Il existe une relation d'ordre naturelle et croissante (un niveau 43 = Licence est supérieur à 39 = Bac), ce qui en fait une variable **ordinale**. Ce n'est pas une variable quantitative discrète car l'écart numérique entre deux codes successifs ne correspond pas à un nombre d'années d'études fixe ou régulier.
+
+3. **`REV_FOYER` (valeurs de 1 à 16)** :
+   - **Type : Qualitative ordinale (tranches de revenu)**.
+   - *Justification* : Bien que le revenu soit une grandeur continue à la base, cette variable est enregistrée ici sous forme de 16 classes/tranches ordonnées (de la plus basse à la plus élevée). Les intervalles entre chaque tranche n'étant pas nécessairement constants, il s'agit d'une variable qualitative ordinale (on ne peut pas effectuer d'opérations arithmétiques directes sur ces numéros de tranche sans biais).
+
+
+## 3. Vérifier les types R, les modalités réellement présentes, les valeurs manquantes et les éventuels doublons. Produire un tableau synthétique de contrôle.
+
+```{r}
+# . R Types
+str(data)
+
+# . modalité réellement présentes
+summary(data)
+
+# . Vérification des doublons
+nb_doublons <- sum(duplicated(data))
+cat("Nombre de doublons :", nb_doublons, "\n")
+
+# . Vérification des valeurs manquantes globales
+total_na <- sum(is.na(data))
+cat("Nombre total de valeurs manquantes (NA) :", total_na, "\n")
+
+# . Construction du tableau synthétique de contrôle
+controle <- data.frame(
+  Variable = names(data),
+  Type_R = sapply(data, class),
+  Type_Statistique = c(
+    "Quantitative continue",
+    "Qualitative nominale",
+    "Qualitative nominale",
+    "Qualitative nominale",
+    "Quantitative continue",
+    "Qualitative nominale",
+    "Qualitative nominale (codée)",
+    "Qualitative ordinale (codée)",
+    "Quantitative discrète",
+    "Quantitative discrète",
+    "Qualitative ordinale (tranches)"
+  ),
+  Nb_Valeurs_Uniques = sapply(data, function(x) length(unique(x))),
+  Nb_NA = colSums(is.na(data)),
+  Modalites_ou_Etendue = sapply(data, function(x) {
+  if (is.character(x) || length(unique(x)) <= 20) {
+    paste(sort(unique(x)), collapse = ", ")
+  } else {
+    paste0(min(x), " à ", max(x))
+  }
+}),
+  stringsAsFactors = FALSE
+)
+controle
+```
