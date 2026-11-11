@@ -90,3 +90,37 @@ controle <- data.frame(
 )
 controle
 ```
+
+
+## 4
+
+```{r}
+q1 <- quantile(data$SAL_HOR, 0.25)
+q3 <- quantile(data$SAL_HOR, 0.75)
+seuil_haut <- q3 + 3 * (q3 - q1)
+
+controle_valeurs <- data.frame(
+  Regle = c("AGE < 16 ou > 100", "AGE >= 75",
+            "SAL_HOR <= 0", "SAL_HOR < 7.25", "SAL_HOR > Q3 + 3 IQR",
+            "NB_ENF < 0", "NB_ENF >= NB_PERS",
+            "NB_PERS < 1", "NB_PERS > 10"),
+  Nature = c("impossible", "suspect", "impossible", "suspect", "suspect",
+             "impossible", "incohérent", "impossible", "suspect"),
+  Nb_obs = c(
+    sum(data$AGE < 16 | data$AGE > 100),
+    sum(data$AGE >= 75),
+    sum(data$SAL_HOR <= 0),
+    sum(data$SAL_HOR < 7.25),
+    sum(data$SAL_HOR > seuil_haut),
+    sum(data$NB_ENF < 0),
+    sum(data$NB_ENF >= data$NB_PERS),
+    sum(data$NB_PERS < 1),
+    sum(data$NB_PERS > 10)
+  )
+)
+controle_valeurs
+
+# Voir les lignes concernées, sans rien supprimer
+data[data$SAL_HOR > seuil_haut, ]
+data[data$NB_PERS > 10, ]
+```
