@@ -1,126 +1,408 @@
-# Partie 1
-# 1 — Importation et qualité des données
+  # Partie 1
+  # 1 — Importation et qualité des données
 
-## 1- Importer le fichier dans R. Indiquer le nombre d’observations, le nombre de variables et l’unité statistique. Présenter les cinq premières lignes sans divulguer d’informations personnelles.
+  ## 1- Importer le fichier dans R. Indiquer le nombre d’observations, le nombre de variables et l’unité statistique. Présenter les cinq premières lignes sans divulguer d’informations personnelles.
+
+  ```{r}
+  recens <- read.table("Recensement.txt", header = TRUE, sep = "\t")
+  dim(recens)
+  names(recens)
+  head(recens, 5)
+  ```
+
+  - **Nombre d'observations** : 599 individus.
+  - **Nombre de variables** : 11 colonnes.
+  - **Unité statistique** : Un travailleur / individu recensé.
+
+
+  ## 2. Identifier le type statistique de chaque variable (qualitative nominale, ordinale, quantitative discrète ou continue). Justifier les cas discutables, notamment NIV_ETUDES, CATEGORIE et REV_FOYER.
+
+  ### Classification des variables :
+
+  - **AGE** : **Quantitative continue**. La nature d'une variable dépend de l'ensemble de ses valeurs possibles (ici un intervalle de ℝ) et non des valeurs mesurées : l'âge est enregistré en années entières, mais ce n'est qu'un arrondi de mesure.
+  - **SEXE** : **Qualitative nominale** (binaire : `F`, `M`, pas d'ordre hiérarchique).
+  - **REGION** : **Qualitative nominale** (4 zones géographiques : `NE`, `NW`, `S`, `W`, sans ordre naturel).
+  - **STAT_MARI** : **Qualitative nominale** (modalités : `C`, `D`, `M`, `S`, `V`, sans hiérarchie).
+  - **SAL_HOR** : **Quantitative continue**.
+  - **SYNDICAT** : **Qualitative nominale** (dichotomique : `non`, `oui`).
+  - **NB_PERS** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
+  - **NB_ENF** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
+
+  ### Justification des cas discutables :
+
+  1. **`CATEGORIE` (valeurs de 1 à 10)** :
+    - **Type : Qualitative nominale codée numériquement**.
+    - *Justification* : Les entiers de 1 à 10 représentent des catégories socioprofessionnelles ou secteurs d'emploi. Il n'existe aucune relation d'ordre mathématique ou hiérarchique entre eux (la catégorie 4 n'est pas le « double » de la catégorie 2). Calculer une moyenne ou une somme sur cette variable n'a aucun sens statistique. Le fait que R l'enregistre comme `integer` est uniquement un format de stockage.
+
+  2. **`NIV_ETUDES` (valeurs de 32 à 46)** :
+    - **Type : Qualitative ordinale codée numériquement**.
+    - *Justification* : Ces codes correspondent aux paliers de diplômes obtenus (classification standard du recensement/CPS). Il existe une relation d'ordre naturelle et croissante (un niveau 43 = Licence est supérieur à 39 = Bac), ce qui en fait une variable **ordinale**. Ce n'est pas une variable quantitative discrète car l'écart numérique entre deux codes successifs ne correspond pas à un nombre d'années d'études fixe ou régulier.
+
+  3. **`REV_FOYER` (valeurs de 1 à 16)** :
+    - **Type : Qualitative ordinale (tranches de revenu)**.
+    - *Justification* : Bien que le revenu soit une grandeur continue à la base, cette variable est enregistrée ici sous forme de 16 classes/tranches ordonnées (de la plus basse à la plus élevée). Les intervalles entre chaque tranche n'étant pas nécessairement constants, il s'agit d'une variable qualitative ordinale (on ne peut pas effectuer d'opérations arithmétiques directes sur ces numéros de tranche sans biais).
 
 ```{r}
-data <- read.table("Recensement.txt", header = TRUE, sep = "\t")
-dim(data)
-names(data)
-head(data, 5)
+recens$CATEGORIE  <- as.factor(recens$CATEGORIE)
+recens$NIV_ETUDES <- as.factor(recens$NIV_ETUDES)
+recens$REV_FOYER  <- as.factor(recens$REV_FOYER)
 ```
 
-- **Nombre d'observations** : 599 individus.
-- **Nombre de variables** : 11 colonnes.
-- **Unité statistique** : Un travailleur / individu recensé.
+  ## 3. Vérifier les types R, les modalités réellement présentes, les valeurs manquantes et les éventuels doublons. Produire un tableau synthétique de contrôle.
 
+  ```{r}
+  # . R Types
+  str(recens)
 
-## 2. Identifier le type statistique de chaque variable (qualitative nominale, ordinale, quantitative discrète ou continue). Justifier les cas discutables, notamment NIV_ETUDES, CATEGORIE et REV_FOYER.
+  # . modalité réellement présentes
+  summary(recens)
 
-### Classification des variables :
+  # . Vérification des doublons
+  nb_doublons <- sum(duplicated(recens))
+  cat("Nombre de doublons :", nb_doublons, "\n")
 
-- **AGE** : **Quantitative discrète** quantitative, mesurée en années entières.
-- **SEXE** : **Qualitative nominale** (binaire : `F`, `M`, pas d'ordre hiérarchique).
-- **REGION** : **Qualitative nominale** (4 zones géographiques : `NE`, `NW`, `S`, `W`, sans ordre naturel).
-- **STAT_MARI** : **Qualitative nominale** (modalités : `C`, `D`, `M`, `S`, `V`, sans hiérarchie).
-- **SAL_HOR** : **Quantitative continue**.
-- **SYNDICAT** : **Qualitative nominale** (dichotomique : `non`, `oui`).
-- **NB_PERS** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
-- **NB_ENF** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
+  # . Vérification des valeurs manquantes globales
+  total_na <- sum(is.na(recens))
+  cat("Nombre total de valeurs manquantes (NA) :", total_na, "\n")
 
-### Justification des cas discutables :
-
-1. **`CATEGORIE` (valeurs de 1 à 10)** :
-   - **Type : Qualitative nominale codée numériquement**.
-   - *Justification* : Les entiers de 1 à 10 représentent des catégories socioprofessionnelles ou secteurs d'emploi. Il n'existe aucune relation d'ordre mathématique ou hiérarchique entre eux (la catégorie 4 n'est pas le « double » de la catégorie 2). Calculer une moyenne ou une somme sur cette variable n'a aucun sens statistique. Le fait que R l'enregistre comme `integer` est uniquement un format de stockage.
-
-2. **`NIV_ETUDES` (valeurs de 32 à 46)** :
-   - **Type : Qualitative ordinale codée numériquement**.
-   - *Justification* : Ces codes correspondent aux paliers de diplômes obtenus (classification standard du recensement/CPS). Il existe une relation d'ordre naturelle et croissante (un niveau 43 = Licence est supérieur à 39 = Bac), ce qui en fait une variable **ordinale**. Ce n'est pas une variable quantitative discrète car l'écart numérique entre deux codes successifs ne correspond pas à un nombre d'années d'études fixe ou régulier.
-
-3. **`REV_FOYER` (valeurs de 1 à 16)** :
-   - **Type : Qualitative ordinale (tranches de revenu)**.
-   - *Justification* : Bien que le revenu soit une grandeur continue à la base, cette variable est enregistrée ici sous forme de 16 classes/tranches ordonnées (de la plus basse à la plus élevée). Les intervalles entre chaque tranche n'étant pas nécessairement constants, il s'agit d'une variable qualitative ordinale (on ne peut pas effectuer d'opérations arithmétiques directes sur ces numéros de tranche sans biais).
-
-
-## 3. Vérifier les types R, les modalités réellement présentes, les valeurs manquantes et les éventuels doublons. Produire un tableau synthétique de contrôle.
-
-```{r}
-# . R Types
-str(data)
-
-# . modalité réellement présentes
-summary(data)
-
-# . Vérification des doublons
-nb_doublons <- sum(duplicated(data))
-cat("Nombre de doublons :", nb_doublons, "\n")
-
-# . Vérification des valeurs manquantes globales
-total_na <- sum(is.na(data))
-cat("Nombre total de valeurs manquantes (NA) :", total_na, "\n")
-
-# . Construction du tableau synthétique de contrôle
-controle <- data.frame(
-  Variable = names(data),
-  Type_R = sapply(data, class),
-  Type_Statistique = c(
-    "Quantitative continue",
-    "Qualitative nominale",
-    "Qualitative nominale",
-    "Qualitative nominale",
-    "Quantitative continue",
-    "Qualitative nominale",
-    "Qualitative nominale (codée)",
-    "Qualitative ordinale (codée)",
-    "Quantitative discrète",
-    "Quantitative discrète",
-    "Qualitative ordinale (tranches)"
-  ),
-  Nb_Valeurs_Uniques = sapply(data, function(x) length(unique(x))),
-  Nb_NA = colSums(is.na(data)),
-  Modalites_ou_Etendue = sapply(data, function(x) {
-  if (is.character(x) || length(unique(x)) <= 20) {
-    paste(sort(unique(x)), collapse = ", ")
-  } else {
-    paste0(min(x), " à ", max(x))
-  }
-}),
-  stringsAsFactors = FALSE
-)
-controle
-```
-
-
-## 4
-
-```{r}
-q1 <- quantile(data$SAL_HOR, 0.25)
-q3 <- quantile(data$SAL_HOR, 0.75)
-seuil_haut <- q3 + 3 * (q3 - q1)
-
-controle_valeurs <- data.frame(
-  Regle = c("AGE < 16 ou > 100", "AGE >= 75",
-            "SAL_HOR <= 0", "SAL_HOR < 7.25", "SAL_HOR > Q3 + 3 IQR",
-            "NB_ENF < 0", "NB_ENF >= NB_PERS",
-            "NB_PERS < 1", "NB_PERS > 10"),
-  Nature = c("impossible", "suspect", "impossible", "suspect", "suspect",
-             "impossible", "incohérent", "impossible", "suspect"),
-  Nb_obs = c(
-    sum(data$AGE < 16 | data$AGE > 100),
-    sum(data$AGE >= 75),
-    sum(data$SAL_HOR <= 0),
-    sum(data$SAL_HOR < 7.25),
-    sum(data$SAL_HOR > seuil_haut),
-    sum(data$NB_ENF < 0),
-    sum(data$NB_ENF >= data$NB_PERS),
-    sum(data$NB_PERS < 1),
-    sum(data$NB_PERS > 10)
+  # . Construction du tableau synthétique de contrôle
+  controle <- data.frame(
+    Variable = names(recens),
+    Type_R = sapply(recens, class),
+    Type_Statistique = c(
+      "Quantitative discrète",
+      "Qualitative nominale",
+      "Qualitative nominale",
+      "Qualitative nominale",
+      "Quantitative continue",
+      "Qualitative nominale",
+      "Qualitative nominale (codée)",
+      "Qualitative ordinale (codée)",
+      "Quantitative discrète",
+      "Quantitative discrète",
+      "Qualitative ordinale (tranches)"
+    ),
+    Nb_Valeurs_Uniques = sapply(recens, function(x) length(unique(x))),
+    Nb_NA = colSums(is.na(recens)),
+    Modalites_ou_Etendue = sapply(recens, function(x) {
+    if (is.character(x) || length(unique(x)) <= 20) {
+      paste(sort(unique(x)), collapse = ", ")
+    } else {
+      paste0(min(x), " à ", max(x))
+    }
+  }),
+    stringsAsFactors = FALSE
   )
-)
-controle_valeurs
+  controle
+  ```
 
-# Voir les lignes concernées, sans rien supprimer
-data[data$SAL_HOR > seuil_haut, ]
-data[data$NB_PERS > 10, ]
+
+  ## 4. Rechercher des valeurs impossibles ou suspectes (âge, salaire, nombre d’enfants, taille du foyer). Définir et justifier les règles de contrôle sans supprimer automatiquement les observations.
+
+  ```{r}
+  q1 <- quantile(recens$SAL_HOR, 0.25)
+  q3 <- quantile(recens$SAL_HOR, 0.75)
+  seuil_haut <- q3 + 3 * (q3 - q1)
+
+  controle_valeurs <- data.frame(
+    Regle = c("AGE < 16 ou > 100", "AGE >= 75",
+              "SAL_HOR <= 0", "SAL_HOR < 7.25", "SAL_HOR > Q3 + 3 IQR",
+              "NB_ENF < 0", "NB_ENF >= NB_PERS",
+              "NB_PERS < 1", "NB_PERS > 10"),
+    Nature = c("impossible", "suspect", "impossible", "suspect", "suspect",
+              "impossible", "incohérent", "impossible", "suspect"),
+    Nb_obs = c(
+      sum(recens$AGE < 16 | recens$AGE > 100),
+      sum(recens$AGE >= 75),
+      sum(recens$SAL_HOR <= 0),
+      sum(recens$SAL_HOR < 7.25),
+      sum(recens$SAL_HOR > seuil_haut),
+      sum(recens$NB_ENF < 0),
+      sum(recens$NB_ENF >= recens$NB_PERS),
+      sum(recens$NB_PERS < 1),
+      sum(recens$NB_PERS > 10)
+    )
+  )
+  controle_valeurs
+
+ 
+ # Toutes les observations suspectes, sans rien supprimer
+suspects <- recens[recens$AGE >= 75 |
+                   recens$SAL_HOR < 7.25 |
+                   recens$SAL_HOR > seuil_haut |
+                   recens$NB_PERS > 10, ]
+nrow(suspects)   # nombre d'individus concernés (un individu peut cocher plusieurs règles)
+suspects
 ```
+
+
+## 5. Préciser la population effectivement analysée pour SAL_HOR et le traitement des valeurs manquantes ou nulles. Discuter l’impact possible de ces choix sur les résultats.
+
+un salaire très élevé ou inférieur au minimum fédéral n'est pas nécessairement une erreur. Pour mesurer l'effet de ce choix, les indicateurs sont recalculés en les retirant
+
+```{r}
+# Population analysée pour SAL_HOR
+sum(is.na(recens$SAL_HOR))     # valeurs manquantes
+sum(recens$SAL_HOR <= 0)       # valeurs nulles ou négatives
+sum(!is.na(recens$SAL_HOR) & recens$SAL_HOR > 0)   # effectif analysé
+
+# Sensibilité aux observations atypiques
+resume <- function(x) c(n = length(x), moyenne = mean(x), mediane = median(x), ecart_type = sd(x))
+
+sensibilite <- rbind(
+  "Tous"                    = resume(recens$SAL_HOR),
+  "Sans extrêmes hauts"     = resume(recens$SAL_HOR[recens$SAL_HOR <= seuil_haut]),
+  "Sans salaires < 7,25"    = resume(recens$SAL_HOR[recens$SAL_HOR >= 7.25]),
+  "Sans les deux"           = resume(recens$SAL_HOR[recens$SAL_HOR >= 7.25 & recens$SAL_HOR <= seuil_haut])
+)
+round(sensibilite, 2)
+```
+La médiane reste stable (environ 15 $/h dans tous les cas), alors que la moyenne varie d'environ un dollar et que l'écart-type diminue nettement lorsque les salaires extrêmes sont retirés (de 11,28 à 9,04 $/h). Conserver ces observations ne modifie donc pas le niveau « typique » des salaires, mais augmente la moyenne et la dispersion ; la médiane sera préférée pour résumer cette variable.
+
+# 2 — Décrire la population$
+
+## 6. Construire un tableau d’effectifs et de fréquences pour SEXE, REGION, STAT_MARI, SYNDICAT et CATEGORIE. Donner les dénominateurs utilisés.
+
+```{r}
+  # Fonction qui fait le tableau d'une variable : effectifs + fréquences
+tab_freq <- function(x, nom) {
+  eff <- table(x)
+  data.frame(Variable = nom,
+             Modalite = names(eff),
+             Effectif = as.vector(eff),
+             Frequence_pct = round( as.vector(prop.table(eff)), 1))
+}
+
+tableau_effectifs_frequences <- rbind(
+  tab_freq(recens$SEXE, "SEXE"),
+  tab_freq(recens$REGION, "REGION"),
+  tab_freq(recens$STAT_MARI, "STAT_MARI"),
+  tab_freq(recens$SYNDICAT, "SYNDICAT"),
+  tab_freq(recens$CATEGORIE, "CATEGORIE")
+)
+tableau_effectifs_frequences
+```
+## Les dénominateurs
+
+Ici, pour chaque variable, le dénominateur est 599 (tous les individus), car aucune de ces cinq variables n’a de valeur manquante
+
+## 7. Choisir deux représentations graphiques adaptées à ces variables ; expliquer pourquoi ces graphiques sont plus lisibles que d’autres.
+
+```{r}
+vars4 <- c("SEXE", "REGION", "STAT_MARI", "SYNDICAT")
+
+# Figure 1 : diagrammes en barres (% de n = 599)
+par(mfrow = c(2, 2))
+for (v in vars4) {
+  p <- 100 * prop.table(table(recens[[v]]))
+  b <- barplot(p, main = v, ylab = "Fréquence (%)", ylim = c(0, 100), col = "steelblue")
+  text(b, p, labels = paste0(round(p, 1), " %"), pos = 3, cex = 0.8)
+}
+par(mfrow = c(1, 1))
+
+# Figure 2 : camemberts
+par(mfrow = c(2, 2))
+for (v in vars4) {
+  t <- table(recens[[v]])
+  pie(t, labels = paste0(names(t), " (", round(100 * prop.table(t), 1), " %)"), main = v)
+}
+par(mfrow = c(1, 1))
+
+# Figure 3 : CATEGORIE en barres triées (pas de camembert : 10 modalités)
+p <- sort(100 * prop.table(table(recens$CATEGORIE)), decreasing = TRUE)
+b <- barplot(p, xlab = "Code de catégorie", ylab = "Fréquence (%)", ylim = c(0, 25),
+             main = "Répartition par catégorie (n = 599)", col = "steelblue")
+text(b, p, labels = paste0(round(p, 1), " %"), pos = 3, cex = 0.8)
+```
+### Représentations graphiques des variables qualitatives
+Deux représentations graphiques ont été retenues pour les variables
+qualitatives : le diagramme en barres et le diagramme circulaire
+(camembert). Les variables à peu de modalités (`SEXE`, `REGION`,
+`STAT_MARI`, `SYNDICAT`) sont représentées avec les deux, en pourcentage
+des 599 individus ; les diagrammes en barres partagent un axe commun de 0
+à 100 % pour que les quatre panneaux restent comparables. La variable
+`CATEGORIE`, qui compte dix modalités, est représentée uniquement par un
+diagramme en barres trié par fréquence décroissante : le tri est possible
+car la variable est nominale, et le camembert est écarté car il devient
+illisible lorsque les modalités sont nombreuses.
+
+Le diagramme en barres est le plus lisible, car l'œil compare bien des
+longueurs alignées sur une même base, et les petites modalités restent
+visibles. Le camembert donne une vue d'ensemble de la répartition quand
+il y a peu de modalités (`SEXE`, `SYNDICAT`), mais l'œil compare mal les
+angles et les petites parts deviennent difficiles à lire, comme pour
+`STAT_MARI` (6 veufs, soit 1,0 %). Les autres graphiques sont écartés :
+l'histogramme est réservé aux variables quantitatives continues, et le
+diagramme en mosaïque devient illisible quand les modalités ont des
+tailles très inégales.
+
+## 8. Étudier la répartition des niveaux d’études : conserver d’abord les codes d’origine puis proposer un regroupement argumenté.
+
+```{r}
+# 1. Distribution sur les codes d'origine (32 à 46)
+eff_etud <- table(recens$NIV_ETUDES)
+freq_etud <- round(100 * prop.table(eff_etud), 2)
+
+# Tableau récapitulatif effectifs + fréquences (%)
+tab_etud_orig <- cbind(Effectif = eff_etud, Frequence_pct = freq_etud)
+addmargins(tab_etud_orig, margin = 1) # Ajoute la ligne Total
+
+# Diagramme en barres en fréquences (ordre naturel conservé)
+par(mar = c(12, 4, 4, 2))   # marge basse élargie
+barplot(prop.table(eff_etud),
+        main = "Répartition des niveaux d'études (codes d'origine)",
+        xlab = "Code niveau d'études",
+        ylab = "Fréquence",
+        col = "grey80",
+        ylim = c(0, 0.35))
+
+# 2. Regroupement en 6 classes via cut()
+
+niv_num <- as.numeric(as.character(recens$NIV_ETUDES))
+
+recens$ETUDES_GRP <- cut(
+  niv_num,
+  breaks = c(31, 39, 42, 43, 44, 45, 46),
+  labels = c("32-39 : Primaire/Secondaire",
+             "40-42 : Postsecondaire sans bachelor",
+             "43 : Bachelor",
+             "44 : Master",
+             "45 : Diplôme d'école spécifique",
+             "46 : Doctorat")
+)
+
+# Tableau effectifs et fréquences (%) après regroupement
+eff_grp <- table(recens$ETUDES_GRP)
+freq_grp <- round(100 * prop.table(eff_grp), 2)
+tab_etud_grp <- cbind(Effectif = eff_grp, Frequence_pct = freq_grp)
+addmargins(tab_etud_grp, margin = 1)
+
+# Diagramme en barres du niveau d'études regroupé
+par(mar = c(12, 4, 4, 2))   # marge basse élargie
+barplot(100 * prop.table(eff_grp),
+        main = "Répartition par niveau d'études regroupé",
+        ylab = "Pourcentage (%)",
+        col = "lightblue",
+        las = 2, # Étiquettes verticales pour la lisibilité
+        ylim = c(0, 45))
+```
+
+### Regroupement des niveaux d'études
+
+Avec les codes d'origine, la distribution est très inégale : les codes 32 à 38 comptent chacun entre 5 et 9 personnes (moins de 1,5 % de l'échantillon), alors que le code 39 en regroupe 187 (31,2 %). Cette dispersion rend le diagramme peu lisible et les comparaisons ultérieures fragiles.
+
+Nous avons donc regroupé les codes en six classes, selon les catégories de l'énoncé :
+
+- **32-39 (primaire/secondaire)** : 232 personnes (38,7 %). Ces codes correspondent au même palier de formation, et les regrouper évite des classes de moins de 10 personnes.
+- **40-42 (postsecondaire sans bachelor)** : 215 personnes (35,9 %). Ces niveaux sont proches (études supérieures courtes ou non diplômantes) et n'atteignent pas le bachelor.
+- **43 (bachelor)** : 114 personnes (19,0 %). Ce diplôme est conservé seul car l'effectif est suffisant et le niveau est bien défini.
+- **44 (master)**, **45 (diplôme d'école spécifique)** et **46 (doctorat)** : 29, 4 et 5 personnes (4,8 %, 0,7 % et 0,8 %). Ces niveaux sont distincts, donc maintenus séparés.
+
+Ce regroupement a une limite : les classes 45 et 46 ont des effectifs très faibles (4 et 5 personnes). Les moyennes ou les pourcentages calculés sur ces groupes seront peu fiables et doivent être interprétés avec prudence. De plus, le code 45 correspond à une formation spécifique qui n'est pas nécessairement « supérieure » au master : l'ordre croissant des classes est donc à manier avec précaution.
+
+Aucune observation n'est perdue lors du regroupement : les effectifs des six classes totalisent bien 599 personnes.
+
+## 9. Comparer la structure des catégories 1, 2 et 5 selon le sexe et le niveau d’études. Utiliser des pourcentages conditionnels clairement identifiés.
+
+```{r}
+# --- 9a. Catégorie x sexe ---
+t_sexe <- table(sous$CATEGORIE, sous$SEXE)
+
+knitr::kable(addmargins(t_sexe),
+             caption = "Effectifs par catégorie et par sexe (n = 273)")
+
+tab_sexe_pct <- round(100 * prop.table(t_sexe, margin = 1), 1)
+knitr::kable(tab_sexe_pct,
+             caption = "Répartition par sexe au sein de chaque catégorie (% en ligne ; dénominateur : effectif de la catégorie)")
+
+part_F <- 100 * mean(recens$SEXE == "F")   # part des femmes dans les 599 personnes (≈ 49,6)
+
+barplot(t(prop.table(t_sexe, margin = 1)) * 100,
+        beside = TRUE, legend.text = TRUE,
+        ylab = "% dans la catégorie", ylim = c(0, 100),
+        main = "Répartition par sexe selon la catégorie",
+        sub = "% calculés dans chaque catégorie (n = 273) ; pointillé : part des femmes dans l'échantillon (n = 599)",
+        args.legend = list(x = "topleft"))
+abline(h = part_F, lty = 2)
+
+# --- 9b. Catégorie x niveau d'études regroupé ---
+t_etud <- table(sous$CATEGORIE, sous$ETUDES_GRP)
+
+knitr::kable(addmargins(t_etud),
+             caption = "Effectifs par catégorie et par niveau d'études regroupé (n = 273)")
+
+tab_etud_pct <- round(100 * prop.table(t_etud, margin = 1), 1)
+knitr::kable(tab_etud_pct,
+             caption = "Niveau d'études au sein de chaque catégorie (% en ligne ; dénominateur : effectif de la catégorie)")
+
+# Graphique : barres empilées (profil d'études par catégorie)
+par(mar = c(6, 4, 4, 8), xpd = TRUE)   # marge droite élargie pour la légende
+barplot(t(prop.table(t_etud, margin = 1)) * 100,
+        legend.text = c("32-39", "40-42", "43", "44", "45", "46"),
+        args.legend = list(x = "right", inset = -0.3, cex = 0.8, title = "Études"),
+        ylab = "% dans la catégorie",
+        main = "Niveau d'études selon la catégorie",
+        sub = "% calculés dans chaque catégorie (n = 273)")
+par(mar = c(5, 4, 4, 2) + 0.1, xpd = FALSE)   # remise à l'état normal
+```
+
+## 10.  Identifier deux différences marquantes et expliquer pourquoi les effectifs bruts peuvent conduire à une conclusion trompeuse lorsque les tailles de groupes diffèrent.
+
+```{r}
+# Indicateur : diplôme de niveau bachelor ou plus (codes >= 43), choix à justifier
+sous$SUP <- as.numeric(as.character(sous$NIV_ETUDES)) >= 43
+t_sup <- table(sous$CATEGORIE, sous$SUP)
+
+# Tableau de comparaison : effectifs bruts vs pourcentages dans la catégorie
+comp <- data.frame(
+  Taille       = as.vector(table(sous$CATEGORIE)),
+  Femmes_eff   = t_sexe[, "F"],
+  Femmes_pct   = round(100 * prop.table(t_sexe, margin = 1)[, "F"], 1),
+  Sup_eff      = t_sup[, "TRUE"],
+  Sup_pct      = round(100 * prop.table(t_sup, margin = 1)[, "TRUE"], 1)
+)
+knitr::kable(comp,
+             caption = "Effectifs bruts et pourcentages dans la catégorie (dénominateur : effectif de la catégorie)")
+```
+
+**Les deux différences marquantes :** 
+
+**Composition par sexe :** les emplois de bureau sont très féminisés (76,6 % de femmes), la gestion et finance est paritaire (50,0 %), les professions libérales sont entre les deux (61,7 %).
+**Niveau d’études :** 54,9 % des professions libérales ont un bachelor ou plus, contre 43,5 % en gestion et finance et 25,5 % en bureau.
+
+**Pourquoi les effectifs bruts peuvent conduire à une conclusion trompeuse.**
+Ces comparaisons reposent sur des pourcentages calculés dans chaque catégorie, car les effectifs bruts peuvent induire en erreur quand les tailles diffèrent. Les professions libérales comptent par exemple plus de femmes que les emplois de bureau (82 contre 72), alors que leur proportion est plus faible, simplement parce que le groupe est plus grand (133 personnes contre 94). De même, la gestion et la finance et les emplois de bureau ont des nombres de diplômés proches (20 et 24), mais ces nombres représentent 43,5 % et 25,5 % de groupes de taille très différente (46 et 94 personnes). Seuls les pourcentages conditionnels, rapportés à l’effectif de chaque catégorie, permettent de comparer la structure des groupes.
+
+ # 3 —  Distributions et indicateurs
+
+## 11. Pour AGE, SAL_HOR, NB_PERS et NB_ENF, présenter les indicateurs pertinents : effectif valide, moyenne, médiane, écart-type, quartiles, minimum et maximum. Justifier les indicateurs retenus.
+
+```{r}
+# Fonction pour calculer les indicateurs pertinents
+calculer_indicateurs <- function(x) {
+  c(
+    "Effectif valide" = sum(!is.na(x)),
+    "Minimum"         = min(x, na.rm = TRUE),
+    "Q1 (25 %)"       = as.numeric(quantile(x, probs = 0.25, na.rm = TRUE)),
+    "Médiane"         = median(x, na.rm = TRUE),
+    "Moyenne"         = mean(x, na.rm = TRUE),
+    "Q3 (75 %)"       = as.numeric(quantile(x, probs = 0.75, na.rm = TRUE)),
+    "Maximum"         = max(x, na.rm = TRUE),
+    "Écart-type"      = sd(x, na.rm = TRUE)
+  )
+}
+
+colonne_indicateurs <- c("AGE", "SAL_HOR", "NB_PERS", "NB_ENF")
+indicateurs <- sapply(recens[colonne_indicateurs], calculer_indicateurs)
+knitr::kable(indicateurs, digits = 2, caption = "Indicateurs statistiques pour AGE, SAL_HOR, NB_PERS et NB_ENF")
+```
+
+### Justification des indicateurs retenus
+
+Les indicateurs répondent à des questions différentes : l'**effectif valide** vérifie le nombre d'observations utilisables (599 pour chaque variable), la **moyenne** et l'**écart-type** décrivent le centre et la dispersion, la **médiane** et les **quartiles** donnent des mesures équivalentes mais peu sensibles aux valeurs extrêmes, et le **minimum** et le **maximum** donnent l'étendue et aident à repérer les valeurs atypiques. Les utiliser ensemble permet de vérifier si la moyenne résume correctement la variable.
+
+- **AGE** : moyenne (41,85 ans) et médiane (42 ans) sont proches, la distribution est donc plutôt symétrique et la moyenne avec l'écart-type (14,12) la décrit correctement.
+- **SAL_HOR** : la moyenne (17,90 $) dépasse nettement la médiane (15,0 $) et le maximum (99 $) est très éloigné du troisième quartile (22 $). La distribution est asymétrique à droite : quelques salaires élevés tirent la moyenne vers le haut. La médiane et les quartiles (10,5 et 22,0) décrivent donc mieux le salaire typique.
+- **NB_PERS** : variable discrète centrée autour de 3 (moyenne 3,11, médiane 3). Le maximum de 13 correspond à un foyer isolé, déjà signalé lors du contrôle des données.
+- **NB_ENF** : variable discrète où 413 personnes sur 599 (69 %) n'ont pas d'enfant. La médiane et le premier quartile valent 0, et la moyenne (0,53) correspond à une valeur que presque personne n'a. Elle est donc peu informative ici ; nous la présentons car elle est demandée, mais un tableau d'effectifs décrit mieux cette variable.
+
