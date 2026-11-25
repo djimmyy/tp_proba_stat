@@ -1,14 +1,21 @@
+---
+title: "TP statistique descriptive et régression"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+ 
   # Partie 1
   # 1 — Importation et qualité des données
 
   ## 1- Importer le fichier dans R. Indiquer le nombre d’observations, le nombre de variables et l’unité statistique. Présenter les cinq premières lignes sans divulguer d’informations personnelles.
 
-  ```{r}
+```{r}
 recens <- read.table("Recensement.txt", header = TRUE, sep = "\t")
 dim(recens)
 names(recens)
 head(recens, 5)
-  ```
+```
 
   - **Nombre d'observations** : 599 individus.
   - **Nombre de variables** : 11 colonnes.
@@ -25,8 +32,8 @@ head(recens, 5)
   - **STAT_MARI** : **Qualitative nominale** (modalités : `C`, `D`, `M`, `S`, `V`, sans hiérarchie).
   - **SAL_HOR** : **Quantitative continue**.
   - **SYNDICAT** : **Qualitative nominale** (dichotomique : `non`, `oui`).
-  - **NB_PERS** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
-  - **NB_ENF** : **Quantitative discrète** dénombrements, donc quantitatives discrètes.
+  - **NB_PERS** : **Quantitative discrète** : dénombrement (valeurs entières).
+  - **NB_ENF** : **Quantitative discrète** : dénombrement (valeurs entières).
 
   ### Justification des cas discutables :
 
@@ -48,9 +55,9 @@ recens$NIV_ETUDES <- as.factor(recens$NIV_ETUDES)
 recens$REV_FOYER <- as.factor(recens$REV_FOYER)
 ```
 
-  ## 3. Vérifier les types R, les modalités réellement présentes, les valeurs manquantes et les éventuels doublons. Produire un tableau synthétique de contrôle.
+## 3. Vérifier les types R, les modalités réellement présentes, les valeurs manquantes et les éventuels doublons. Produire un tableau synthétique de contrôle.
 
-  ```{r}
+```{r}
 # . R Types
 str(recens)
 
@@ -65,12 +72,16 @@ cat("Nombre de doublons :", nb_doublons, "\n")
 total_na <- sum(is.na(recens))
 cat("Nombre total de valeurs manquantes (NA) :", total_na, "\n")
 
+# . répartition des modalités de REV_FOYER
+
+table(recens$REV_FOYER)   
+
 # . Construction du tableau synthétique de contrôle
 controle <- data.frame(
   Variable = names(recens),
   Type_R = sapply(recens, class),
   Type_Statistique = c(
-    "Quantitative discrète",
+    "Quantitative continue",
     "Qualitative nominale",
     "Qualitative nominale",
     "Qualitative nominale",
@@ -94,20 +105,21 @@ controle <- data.frame(
   stringsAsFactors = FALSE
 )
 controle
-  ```
+```
 
+Le dictionnaire initial présente une discontinuité apparente entre les classes 5 (12 500–14 500 $) et 6 (15 000–20 000 $). Le fichier ne contient que le code de classe, pas le revenu : on ne peut ni vérifier ni corriger cette discontinuité. Les codes sont donc conservés tels quels.
 
-  ## 4. Rechercher des valeurs impossibles ou suspectes (âge, salaire, nombre d’enfants, taille du foyer). Définir et justifier les règles de contrôle sans supprimer automatiquement les observations.
+## 4. Rechercher des valeurs impossibles ou suspectes (âge, salaire, nombre d’enfants, taille du foyer). Définir et justifier les règles de contrôle sans supprimer automatiquement les observations.
 
-  ```{r}
+```{r}
 q1 <- quantile(recens$SAL_HOR, 0.25)
 q3 <- quantile(recens$SAL_HOR, 0.75)
-seuil_haut <- q3 + 3 * (q3 - q1)
+seuil_haut <- q3 + 1.5 * (q3 - q1)
 
 controle_valeurs <- data.frame(
   Regle = c(
     "AGE < 16 ou > 100", "AGE >= 75",
-    "SAL_HOR <= 0", "SAL_HOR < 7.25", "SAL_HOR > Q3 + 3 IQR",
+    "SAL_HOR <= 0", "SAL_HOR < 7.25", "SAL_HOR > Q3 + 1.5 IQR",
     "NB_ENF < 0", "NB_ENF >= NB_PERS",
     "NB_PERS < 1", "NB_PERS > 10"
   ),
@@ -139,10 +151,21 @@ nrow(suspects) # nombre d'individus concernés (un individu peut cocher plusieur
 suspects
 ```
 
+Les règles de contrôle distinguent deux cas :
+
+- **Valeurs impossibles** (âge hors de 16-100 ans, salaire ≤ 0, NB_ENF < 0, NB_PERS < 1) : aucune n'est observée.
+- **Valeurs suspectes** (à vérifier, pas forcément fausses) :
+  - AGE ≥ 75 ans : 3 personnes ;
+  - SAL_HOR < 7,25 $ (salaire minimum fédéral en 2012, source à citer) : 17 salaires. Un salaire plus bas peut pourtant être légal ou correct ;
+    - SAL_HOR > Q3 + 1,5 × IQR = 39,25 $ (règle usuelle) : 27 salaires (4,5 %) ;
+  - NB_PERS > 10 : 1 foyer (13 personnes) ;
+  - NB_ENF ≥ NB_PERS : aucun cas.
+
+Aucune observation n'est supprimée : une valeur rare n'est pas forcément une erreur, et on mesure l'effet de ces valeurs à la question suivante.
 
 ## 5. Préciser la population effectivement analysée pour SAL_HOR et le traitement des valeurs manquantes ou nulles. Discuter l’impact possible de ces choix sur les résultats.
 
-un salaire très élevé ou inférieur au minimum fédéral n'est pas nécessairement une erreur. Pour mesurer l'effet de ce choix, les indicateurs sont recalculés en les retirant
+Un salaire très élevé ou inférieur au minimum fédéral n'est pas nécessairement une erreur. Pour mesurer l'effet de ce choix, les indicateurs sont recalculés en les retirant
 
 ```{r}
 # Population analysée pour SAL_HOR
@@ -161,9 +184,11 @@ sensibilite <- rbind(
 )
 round(sensibilite, 2)
 ```
-La médiane reste stable (environ 15 $/h dans tous les cas), alors que la moyenne varie d'environ un dollar et que l'écart-type diminue nettement lorsque les salaires extrêmes sont retirés (de 11,28 à 9,04 $/h). Conserver ces observations ne modifie donc pas le niveau « typique » des salaires, mais augmente la moyenne et la dispersion ; la médiane sera préférée pour résumer cette variable.
+Les 599 salaires sont valides (aucun manquant, aucun nul ou négatif) : toute la population est analysée. Un salaire supérieur à 39,25 $ ou inférieur à 7,25 $ n'est pas forcément une erreur, ces valeurs sont donc conservées. Pour mesurer l'effet de ce choix, les indicateurs sont recalculés en excluant ces valeurs du calcul (elles restent dans le jeu de données).
 
-# 2 — Décrire la population$
+La médiane change peu (de 14,5 à 15,0 $/h selon les cas). La moyenne baisse d'environ 1,7 $ sans les 27 hauts salaires (16,18 $ contre 17,90 $) et monte de 0,4 $ sans les 17 bas salaires (18,29 $). L'écart-type diminue nettement sans les hauts salaires (de 11,28 à 7,51 $/h), mais reste presque inchangé sans les bas salaires (11,20 $/h). Les hauts salaires augmentent donc la moyenne et la dispersion sans modifier beaucoup le niveau typique : la médiane sera préférée pour résumer cette variable.
+
+# 2 — Décrire la population
 
 ## 6. Construire un tableau d’effectifs et de fréquences pour SEXE, REGION, STAT_MARI, SYNDICAT et CATEGORIE. Donner les dénominateurs utilisés.
 
@@ -175,7 +200,7 @@ tab_freq <- function(x, nom) {
     Variable = nom,
     Modalite = names(eff),
     Effectif = as.vector(eff),
-    Frequence_pct = round(as.vector(prop.table(eff)), 1)
+    Frequence_pct = round(100 * as.vector(prop.table(eff)), 1)
   )
 }
 
@@ -223,26 +248,9 @@ b <- barplot(p,
 text(b, p, labels = paste0(round(p, 1), " %"), pos = 3, cex = 0.8)
 ```
 ### Représentations graphiques des variables qualitatives
-Deux représentations graphiques ont été retenues pour les variables
-qualitatives : le diagramme en barres et le diagramme circulaire
-(camembert). Les variables à peu de modalités (`SEXE`, `REGION`,
-`STAT_MARI`, `SYNDICAT`) sont représentées avec les deux, en pourcentage
-des 599 individus ; les diagrammes en barres partagent un axe commun de 0
-à 100 % pour que les quatre panneaux restent comparables. La variable
-`CATEGORIE`, qui compte dix modalités, est représentée uniquement par un
-diagramme en barres trié par fréquence décroissante : le tri est possible
-car la variable est nominale, et le camembert est écarté car il devient
-illisible lorsque les modalités sont nombreuses.
+Deux représentations graphiques ont été retenues pour les variables qualitatives : le diagramme en barres et le diagramme circulaire (camembert). Les variables à peu de modalités (`SEXE`, `REGION`, `STAT_MARI`, `SYNDICAT`) sont représentées avec les deux, en pourcentage des 599 individus ; les diagrammes en barres partagent un axe commun de 0 à 100 % pour que les quatre panneaux restent comparables. La variable `CATEGORIE`, qui compte dix modalités, est représentée uniquement par un diagramme en barres trié par fréquence décroissante : le tri est possible car la variable est nominale, et le camembert est écarté car il devient illisible lorsque les modalités sont nombreuses.
 
-Le diagramme en barres est le plus lisible, car l'œil compare bien des
-longueurs alignées sur une même base, et les petites modalités restent
-visibles. Le camembert donne une vue d'ensemble de la répartition quand
-il y a peu de modalités (`SEXE`, `SYNDICAT`), mais l'œil compare mal les
-angles et les petites parts deviennent difficiles à lire, comme pour
-`STAT_MARI` (6 veufs, soit 1,0 %). Les autres graphiques sont écartés :
-l'histogramme est réservé aux variables quantitatives continues, et le
-diagramme en mosaïque devient illisible quand les modalités ont des
-tailles très inégales.
+Le diagramme en barres est le plus lisible, car l'œil compare bien des longueurs alignées sur une même base, et les petites modalités restent visibles. Le camembert donne une vue d'ensemble de la répartition quand il y a peu de modalités (`SEXE`, `SYNDICAT`), mais l'œil compare mal les angles et les petites parts deviennent difficiles à lire, comme pour `STAT_MARI` (6 veufs, soit 1,0 %). Les autres graphiques sont écartés : l'histogramme est réservé aux variables quantitatives continues, et le diagramme en mosaïque devient illisible quand les modalités ont des tailles très inégales.
 
 ## 8. Étudier la répartition des niveaux d’études : conserver d’abord les codes d’origine puis proposer un regroupement argumenté.
 
@@ -297,6 +305,7 @@ barplot(100 * prop.table(eff_grp),
   las = 2, # Étiquettes verticales pour la lisibilité
   ylim = c(0, 45)
 )
+par(mar = c(5, 4, 4, 2) + 0.1)
 ```
 
 ### Regroupement des niveaux d'études
@@ -305,7 +314,7 @@ Avec les codes d'origine, la distribution est très inégale : les codes 32 à 3
 
 Nous avons donc regroupé les codes en six classes, selon les catégories de l'énoncé :
 
-- **32-39 (primaire/secondaire)** : 232 personnes (38,7 %). Ces codes correspondent au même palier de formation, et les regrouper évite des classes de moins de 10 personnes.
+- **32-39 (primaire/secondaire)** : 232 personnes (38,7 %). Ces codes correspondent au même palier de formation, et les regrouper évite des classes de moins de 5 à 9 personnes.
 - **40-42 (postsecondaire sans bachelor)** : 215 personnes (35,9 %). Ces niveaux sont proches (études supérieures courtes ou non diplômantes) et n'atteignent pas le bachelor.
 - **43 (bachelor)** : 114 personnes (19,0 %). Ce diplôme est conservé seul car l'effectif est suffisant et le niveau est bien défini.
 - **44 (master)**, **45 (diplôme d'école spécifique)** et **46 (doctorat)** : 29, 4 et 5 personnes (4,8 %, 0,7 % et 0,8 %). Ces niveaux sont distincts, donc maintenus séparés.
@@ -318,6 +327,8 @@ Aucune observation n'est perdue lors du regroupement : les effectifs des six cla
 
 ```{r}
 # --- 9a. Catégorie x sexe ---
+sous <- subset(recens, CATEGORIE %in% c(1, 2, 5))
+sous$CATEGORIE <- droplevels(sous$CATEGORIE)     
 t_sexe <- table(sous$CATEGORIE, sous$SEXE)
 
 knitr::kable(addmargins(t_sexe),
@@ -326,7 +337,7 @@ knitr::kable(addmargins(t_sexe),
 
 tab_sexe_pct <- round(100 * prop.table(t_sexe, margin = 1), 1)
 knitr::kable(tab_sexe_pct,
-  caption = "Répartition par sexe au sein de chaque catégorie (% en ligne ; dénominateur : effectif de la catégorie)"
+  caption = "Distribution conditionnelle du sexe sachant la catégorie (% en ligne ; dénominateur : effectif de la catégorie)"
 )
 
 part_F <- 100 * mean(recens$SEXE == "F") # part des femmes dans les 599 personnes (≈ 49,6)
@@ -349,7 +360,7 @@ knitr::kable(addmargins(t_etud),
 
 tab_etud_pct <- round(100 * prop.table(t_etud, margin = 1), 1)
 knitr::kable(tab_etud_pct,
-  caption = "Niveau d'études au sein de chaque catégorie (% en ligne ; dénominateur : effectif de la catégorie)"
+  caption = "Distribution conditionnelle du niveau d'études sachant la catégorie (% en ligne ; dénominateur : effectif de la catégorie)"
 )
 
 # Graphique : barres empilées (profil d'études par catégorie)
@@ -367,7 +378,7 @@ par(mar = c(5, 4, 4, 2) + 0.1, xpd = FALSE) # remise à l'état normal
 ## 10.  Identifier deux différences marquantes et expliquer pourquoi les effectifs bruts peuvent conduire à une conclusion trompeuse lorsque les tailles de groupes diffèrent.
 
 ```{r}
-# Indicateur : diplôme de niveau bachelor ou plus (codes >= 43), choix à justifier
+# Indicateur : diplôme de niveau bachelor ou plus (codes >= 43)
 sous$SUP <- as.numeric(as.character(sous$NIV_ETUDES)) >= 43
 t_sup <- table(sous$CATEGORIE, sous$SUP)
 
@@ -375,14 +386,23 @@ t_sup <- table(sous$CATEGORIE, sous$SUP)
 comp <- data.frame(
   Taille       = as.vector(table(sous$CATEGORIE)),
   Femmes_eff   = t_sexe[, "F"],
-  Femmes_pct   = round(100 * prop.table(t_sexe, margin = 1)[, "F"], 1),
-  Sup_eff      = t_sup[, "TRUE"],
-  Sup_pct      = round(100 * prop.table(t_sup, margin = 1)[, "TRUE"], 1)
+  Femmes_pct   = round(100 * prop.table(t_sexe, margin = 1)[, "F"], 1)
 )
 knitr::kable(comp,
   caption = "Effectifs bruts et pourcentages dans la catégorie (dénominateur : effectif de la catégorie)"
 )
+
+comp_sup <- data.frame(
+  Taille       = as.vector(table(sous$CATEGORIE)),
+  Diplome_eff  = t_sup[, "TRUE"],
+  Diplome_pct  = round(100 * prop.table(t_sup, margin = 1)[, "TRUE"], 1)
+)
+knitr::kable(comp_sup,
+  caption = "Distribution conditionnelle du niveau d'études sachant la catégorie (% en ligne ; dénominateur : effectif de la catégorie)"
+)
 ```
+**Remarque :**
+L'indicateur « bachelor ou plus » regroupe les codes ≥ 43. Il résume le niveau d'études par un seul pourcentage par catégorie, ce qui rend les trois groupes comparables, alors que six classes à effectifs très inégaux le permettraient mal.
 
 **Les deux différences marquantes :** 
 
@@ -415,7 +435,7 @@ colonne_indicateurs <- c("AGE", "SAL_HOR", "NB_PERS", "NB_ENF")
 indicateurs <- sapply(recens[colonne_indicateurs], calculer_indicateurs)
 knitr::kable(indicateurs, digits = 2, caption = "Indicateurs statistiques pour AGE, SAL_HOR, NB_PERS et NB_ENF")
 ```
-
+L'écart-type calculé par sd() est l'écart-type corrigé (dénominateur n − 1), exprimé dans l'unité de la variable ($ pour SAL_HOR, ans pour AGE).
 ### Justification des indicateurs retenus
 
 Les indicateurs répondent à des questions différentes : l'**effectif valide** vérifie le nombre d'observations utilisables (599 pour chaque variable), la **moyenne** et l'**écart-type** décrivent le centre et la dispersion, la **médiane** et les **quartiles** donnent des mesures équivalentes mais peu sensibles aux valeurs extrêmes, et le **minimum** et le **maximum** donnent l'étendue et aident à repérer les valeurs atypiques. Les utiliser ensemble permet de vérifier si la moyenne résume correctement la variable.
@@ -423,7 +443,7 @@ Les indicateurs répondent à des questions différentes : l'**effectif valide**
 - **AGE** : moyenne (41,85 ans) et médiane (42 ans) sont proches, la distribution est donc plutôt symétrique et la moyenne avec l'écart-type (14,12) la décrit correctement.
 - **SAL_HOR** : la moyenne (17,90 $) dépasse nettement la médiane (15,0 $) et le maximum (99 $) est très éloigné du troisième quartile (22 $). La distribution est asymétrique à droite : quelques salaires élevés tirent la moyenne vers le haut. La médiane et les quartiles (10,5 et 22,0) décrivent donc mieux le salaire typique.
 - **NB_PERS** : variable discrète centrée autour de 3 (moyenne 3,11, médiane 3). Le maximum de 13 correspond à un foyer isolé, déjà signalé lors du contrôle des données.
-- **NB_ENF** : variable discrète où 413 personnes sur 599 (69 %) n'ont pas d'enfant. La médiane et le premier quartile valent 0, et la moyenne (0,53) correspond à une valeur que presque personne n'a. Elle est donc peu informative ici ; nous la présentons car elle est demandée, mais un tableau d'effectifs décrit mieux cette variable.
+- **NB_ENF** : variable discrète où 413 personnes sur 599 (69 %) n'ont pas d'enfant. La médiane et le premier quartile valent 0, et la moyenne (0,53) correspond à une valeur que presque personne n'a. Elle est donc peu informative ici, nous la présentons car elle est demandée, mais un tableau d'effectifs décrit mieux cette variable.
 
 
 
@@ -435,19 +455,22 @@ boxplot(recens$SAL_HOR, main = "Boîte à moustaches des salaires horaires", yla
 boxplot.stats(recens$SAL_HOR)$stats
 ```
 
-D'apres l'histogramme, la distribution des salaires horaires est fortement asymétrique à droite, avec une majorité de salaires concentrés entre 7,25 $ et 30 $, et quelques valeurs extrêmes allant jusqu'à 99 $, (le nombre de classes a été choisi pour un compromis entre lisibilité et détail de la distribution). La boîte à moustaches confirme l’asymétrie : la médiane (15 $) est plus proche du premier quartile (10,5 $) que du troisième (22 $), et la moustache supérieure est bien plus longue que l’inférieure. La moitié centrale des salaires est comprise entre 10,5 $ et 22 $ (écart interquartile de 11,5 $). Selon la règle usuelle (1,5 fois l’écart interquartile au-delà des quartiles), 27 salaires, soit 4,5 % de l’échantillon, sont signalés comme atypiques, tous par le haut, jusqu’à 99 $ ; aucun ne l’est par le bas. Ces valeurs sont conservées dans l’analyse : rien n’indique qu’il s’agisse d’erreurs.
+D'apres l'histogramme, la distribution des salaires horaires est fortement asymétrique à droite, avec une majorité de salaires concentrés entre 5 $ et 30 $, et quelques valeurs extrêmes allant jusqu'à 99 $, (le nombre de classes a été choisi pour un compromis entre lisibilité et détail de la distribution). La boîte à moustaches confirme l’asymétrie : la médiane (15 $) est plus proche du premier quartile (10,5 $) que du troisième (22 $), et la moustache supérieure est bien plus longue que l’inférieure. La moitié centrale des salaires est comprise entre 10,5 $ et 22 $ (écart interquartile de 11,5 $). Selon la règle usuelle (1,5 fois l’écart interquartile au-delà des quartiles), 27 salaires, soit 4,5 pour cent de l’échantillon, sont signalés comme atypiques, tous par le haut, jusqu’à 99 $, aucun ne l’est par le bas. Ces valeurs sont conservées dans l’analyse : rien n’indique qu’il s’agisse d’erreurs.
 
 
 ## 13. Tracer deux histogrammes de SAL_HOR avec des découpages différents. Expliquer comment le choix des classes peut modifier la lecture de la distribution.
 
 ```{r}
-  par(mfrow = c(1, 2))
-hist(recens$SAL_HOR, breaks = seq(0, 100, by = 2), main = "Classes de 2 $",
-     xlab = "Salaire horaire ($)", col = "lightblue", border = "white")
-hist(recens$SAL_HOR, breaks = seq(0, 100, by = 10), main = "Classes de 10 $",
-     xlab = "Salaire horaire ($)", col = "lightblue", border = "white")
+par(mfrow = c(1, 2))
+hist(recens$SAL_HOR, breaks = seq(0, 100, by = 2), freq = FALSE,
+     main = "Classes de 2 $", xlab = "Salaire horaire ($)", ylab = "Densité",
+     col = "lightblue", border = "white")
+hist(recens$SAL_HOR, breaks = seq(0, 100, by = 10), freq = FALSE,
+     main = "Classes de 10 $", xlab = "Salaire horaire ($)", ylab = "Densité",
+     col = "lightblue", border = "white")
 par(mfrow = c(1, 1))
 ```
+Les deux histogrammes sont en densité de fréquence (aire = fréquence) pour que leurs hauteurs soient comparables malgré des amplitudes différentes (2 $ et 10 $).
 
 On observe que le choix des classes influence la perception de la distribution. Avec des classes de 2 $, l'histogramme montre une distribution plus détaillée, révélant des variations fines et des pics dans les salaires. En revanche, avec des classes de 10 $, la distribution semble plus lisse et moins détaillée, ce qui peut masquer certaines caractéristiques importantes, comme les concentrations de salaires autour de certains niveaux. Le choix des classes doit donc être fait en fonction de l'objectif de l'analyse et du niveau de détail souhaité.
 
@@ -490,17 +513,160 @@ Non, ces observations ne sont pas nécessairement erronées. Elles représentent
 ## 16. . Tracer et commenter une fonction de répartition empirique pour AGE ou SAL_HOR ; en déduire une proportion ou un quantile à partir du graphique.
 
 ```{r}
- Fn <- ecdf(recens$SAL_HOR)          # fonction de répartition empirique
+Fn <- ecdf(recens$SAL_HOR)
 
 plot(Fn, main = "Fonction de répartition empirique du salaire horaire",
      xlab = "Salaire horaire ($)", ylab = "F(x) = proportion de salaires ≤ x",
      verticals = TRUE, do.points = FALSE)
 
-# Lecture d'une proportion : part des salaires <= 20 $
+# proportion de salaires ≤ 20 $
 abline(v = 20, lty = 2); abline(h = Fn(20), lty = 2)
 Fn(20)                               # ≈ 0,713
 
-# Lecture d'un quantile : valeur x telle que F(x) = 0,5 (médiane) et 0,9
-abline(h = c(0.5, 0.9), lty = 3)
-quantile(recens$SAL_HOR, c(0.5, 0.9))   # 15,0 et 30,0
 ```
+
+La fonction de répartition empirique du salaire horaire est une fonction en escalier, croissante de 0 à 1, qui fait un saut de 1/599 à chaque observation. Elle monte rapidement dans les bas salaires (de 0,24 à 10 $ à 0,83 à 25 $) puis ralentit : il faut aller jusqu'à 40 $ pour atteindre 0,96. Cette approche lente de 1 confirme l'asymétrie à droite et la longue queue de salaires élevés.
+
+Sur le graphique, la lecture à x = 20 $ donne F(20) ≈ 0,71 : environ 71 pour cent des personnes gagnent au plus 20 $ de l'heure. Le calcul exact confirme cette lecture (F(20) = 0,713).
+
+## 17. Expliquer la différence entre la variance descriptive (dénominateur n) et la variance corrigée (dénominateur n − 1).Préciser que var() dans R utilise n − 1 pour au moins deux observations valides.
+
+```{r}
+x <- recens$SAL_HOR
+n <- length(x)
+
+var_corrigee    <- var(x)                         # n - 1 : ce que fait R
+var_descriptive <- sum((x - mean(x))^2) / n       # n : formule du cours
+c(var_corrigee, var_descriptive)
+var_corrigee * (n - 1) / n                        # retrouve var_descriptive
+
+sd(x)                  # écart-type corrigé
+sqrt(var_descriptive)  # écart-type descriptif
+```
+
+La variance descriptive divise la somme des carrés des écarts à la moyenne par n : c’est la moyenne des carrés des écarts, qui décrit exactement les n observations disponibles. La variance corrigée divise par n − 1 et sert à estimer la variance de la population dont l’échantillon est tiré : comme la moyenne est elle-même estimée à partir des données, la division par n sous-estime légèrement la variance de la population, et la division par n − 1 corrige ce biais.
+
+La fonction var() utilise le dénominateur n − 1, où n est le nombre d’observations valides (non manquantes), elle n’est définie que si n ≥ 2 et renvoie NA pour une seule observation.
+
+
+# 4 — Comparer et interpréter
+
+## 18. Comparer les salaires horaires des catégories professionnelles 1, 2 et 5 dans un tableau commun et un graphique comparatif. Commenter les différences de centre et de dispersion.
+
+```{r}
+# Comparaison des salaires horaires selon la catégorie professionnelle (1, 2 et 5)
+stats_cat <- sapply(split(sous$SAL_HOR, sous$CATEGORIE), calculer_indicateurs)
+
+knitr::kable(stats_cat, digits = 2,
+             caption = "Salaire horaire ($) selon la catégorie professionnelle (n = 273)")
+
+
+
+# Graphique comparatif
+boxplot(SAL_HOR ~ CATEGORIE, data = sous,
+        xlab = "Catégorie professionnelle", ylab = "Salaire horaire ($)",
+        main = "Salaire horaire selon la catégorie", col = "lightblue")
+
+```
+
+ **Centre :** les catégories 1 et 2 ont la même médiane (20 $ de l'heure) et des moyennes proches (25,22 $ et 23,93 $). Les employés de bureau (catégorie 5) gagnent nettement moins : médiane de 14 $, moyenne de 15,16 $, soit environ 6 $ de moins.
+ **Moyenne et médiane :** en catégorie 1, la moyenne (25,22 $) est bien au-dessus de la médiane (20 $) : quelques salaires très élevés, jusqu'à 99 $, la tirent vers le haut. En catégorie 5, les deux sont proches (15,16 $ et 14 $), donc les salaires sont répartis plus régulièrement.
+ **Dispersion :** en catégorie 5, les salaires sont assez proches les uns des autres (écart-type de 4,40 $, écart interquartile de 6 $). En catégories 1 et 2, ils sont beaucoup plus variés (écarts-types de 16,41 $ et 13,73 $, écarts interquartiles de 15,75 $ et 15 $), soit plus de deux fois l'écart de la catégorie 5.
+ **Valeurs atypiques :** elles sont plus nombreuses dans les catégories les mieux payées (3 en catégorie 1, 8 en catégorie 2) et absentes en catégorie 5.
+
+## 19. Comparer les salaires horaires selon le sexe, globalement puis à l’intérieur des catégories 1, 2 et 5. Les conclusions sont-elles identiques ?
+
+```{r}
+# Comparaison globale selon le sexe
+sexe_stats <- sapply(split(recens$SAL_HOR, recens$SEXE), calculer_indicateurs)
+
+knitr::kable(sexe_stats, digits = 2,
+             caption = "Salaire horaire ($) selon le sexe (n = 599)")
+
+
+# Comparaison selon le sexe à l'intérieur des catégories 1, 2 et 5
+sexe_cat_stats <- sapply(split(sous$SAL_HOR, list(sous$CATEGORIE, sous$SEXE)), calculer_indicateurs)
+
+knitr::kable(sexe_cat_stats, digits = 2,
+             caption = "Salaire horaire ($) selon le sexe et la catégorie professionnelle (n = 273)")
+
+
+# Global : F en rose, M en bleu
+boxplot(SAL_HOR ~ SEXE, data = recens,
+        xlab = "Sexe", ylab = "Salaire horaire ($)",
+        main = "Salaire horaire selon le sexe", col = c("lightpink", "lightblue"))
+
+# Par catégorie : ordre F.1, M.1, F.2, M.2, F.5, M.5
+boxplot(SAL_HOR ~ interaction(SEXE, CATEGORIE), data = sous,
+        xlab = "Sexe et catégorie professionnelle", ylab = "Salaire horaire ($)",
+        main = "Salaire horaire selon le sexe et la catégorie",
+        col = c("lightpink", "lightblue"))
+legend("topright", legend = c("Femmes", "Hommes"),
+       fill = c("lightpink", "lightblue"), cex = 0.8)
+```
+
+Globalement, les hommes ont un salaire horaire plus élevé que les femmes (moyenne de 19,17 $ contre 16,60 $, médiane de 15,70 $ contre 14,0 $). Cette différence se retrouve dans les catégories 1 et 2, où l'écart de médiane est de 2,0 $ et 2,6 $ en faveur des hommes, et il est plus marqué en moyenne dans la catégorie 2 (27,70 $ contre 21,59 $). En revanche, parmi les employés de bureau et d'administration (catégorie 5), l'écart disparaît : les salaires sont très proches et légèrement plus élevés chez les femmes (médiane de 14,13 $ contre 13,25 $). Les conclusions ne sont donc pas identiques selon que l'on compare globalement ou à l'intérieur des catégories. Ces constats restent descriptifs : ils ne permettent pas d'en déduire une cause, et les effectifs sont faibles dans certains groupes.
+
+
+## 20. Étudier l’association descriptive entre niveau d’études et salaire horaire. Le résultat permet-il de conclure à un effet causal du diplôme ?
+
+```{r}
+# Étude de l'association entre niveau d'études et salaire horaire
+stats_etudes <- sapply(split(recens$SAL_HOR, recens$ETUDES_GRP), calculer_indicateurs)
+knitr::kable(stats_etudes, digits = 2,
+             caption = "Salaire horaire ($) selon le niveau d'études (n = 599)")
+
+# Graphique : boîte à moustaches par niveau d'études
+boxplot(SAL_HOR ~ ETUDES_GRP, data = recens,
+        xlab = "Niveau d'études regroupé", ylab = "Salaire horaire ($)",
+        main = "Salaire horaire selon le niveau d'études", col = "lightblue",
+        las = 2) # étiquettes verticales pour la lisibilité
+
+
+
+```
+
+**Ce que montrent les données :**
+- Le salaire horaire tend à augmenter avec le niveau d'études : la médiane passe de 12,5 $ (niveaux 32-39) à 14,5 $ (40-42), 18,25 $ (bachelor) et 19,8 $ (master). La dispersion augmente aussi (écart-type de 7,27 $ à 18,91 $).
+- Les niveaux 45 et 46 ne comptent que 4 et 5 personnes : leurs valeurs ne sont pas interprétables.
+
+**Pourquoi on ne peut pas conclure à un effet causal du diplôme :**
+- *Le métier* : les personnes les plus diplômées sont plus souvent dans les catégories les mieux payées (gestion, professions libérales). Parmi les employés de bureau (catégorie 5), la médiane ne passe que de 13,0 $ à 14,6 $ entre les niveaux 32-39 et le bachelor, alors que l'écart global est beaucoup plus grand. Une partie de la hausse vient donc du métier exercé.
+- *L'âge et l'expérience* : les masters ont 50,8 ans en moyenne, contre 41,9 ans pour les niveaux 32-39, ce qui peut jouer sur le salaire.
+- *Les facteurs non observés* : compétences, secteur, milieu familial, absents des données, peuvent influencer à la fois les études et le salaire.
+- *Des données observationnelles* : on compare des personnes différentes, pas la même personne avec et sans diplôme.
+
+**Conclusion :** le niveau d'études est associé à un salaire plus élevé, mais cette association ne prouve pas que le diplôme en est la cause. Il peut en être l'une des raisons, notamment en donnant accès à certains emplois, mais les données ne permettent pas de mesurer sa part.
+
+## 21. Explorer le lien entre âge et salaire horaire avec un nuage de points et une tendance descriptive adaptée. Identifier les limites de l’interprétation.
+
+```{r}
+# Nuage de points : âge vs salaire horaire
+plot(recens$AGE, recens$SAL_HOR,
+     xlab = "Âge (années)", ylab = "Salaire horaire ($)",
+     main = "Nuage de points : âge vs salaire horaire", col = "steelblue", pch = 19)
+
+# Tendance : salaire moyen par classe d'âge
+recens$AGE_CL <- cut(recens$AGE, breaks = c(15, 25, 35, 45, 55, 65, 80))
+tend <- aggregate(cbind(AGE, SAL_HOR) ~ AGE_CL, data = recens, FUN = mean)
+lines(tend$AGE, tend$SAL_HOR, col = "red", lwd = 2, type = "b")   # relie les moyennes de classes
+
+cor(recens$AGE, recens$SAL_HOR)
+
+tab_age <- data.frame(
+  Classe     = levels(recens$AGE_CL),
+  Effectif   = as.vector(table(recens$AGE_CL)),
+  Moyenne    = aggregate(SAL_HOR ~ AGE_CL, data = recens, FUN = mean)$SAL_HOR,
+  Mediane    = aggregate(SAL_HOR ~ AGE_CL, data = recens, FUN = median)$SAL_HOR,
+  Ecart_type = aggregate(SAL_HOR ~ AGE_CL, data = recens, FUN = sd)$SAL_HOR
+)
+knitr::kable(tab_age, digits = 2, row.names = FALSE,
+             caption = "Salaire horaire ($) selon la classe d'âge (n = 599)")
+```
+### Limites de l'interprétation
+
+- **Association, pas causalité :** le lien observé entre l'âge et le salaire ne prouve pas que l'âge fait augmenter le salaire. L'âge est aussi associé à d'autres variables liées au salaire, comme le niveau d'études et la catégorie professionnelle (par exemple, les masters ont 50,8 ans en moyenne contre 41,9 ans pour les niveaux 32 à 39). Les données ne permettent pas de séparer la part de chacune.
+- **Lien faible :** le nuage est très dispersé. À un âge donné, les salaires varient beaucoup, donc l'âge seul ne permet pas de prévoir le salaire d'une personne (le coefficient de corrélation vaut 0,25).
+- **Lien non linéaire :** le salaire augmente surtout entre les moins de 25 ans et les 25 à 35 ans, puis varie peu, entre 19 et 22 $, sans progression régulière. Une droite résumerait mal cette forme, d'où l'usage de moyennes par classe d'âge.
+- **Comparaison de personnes différentes :** les données décrivent des personnes d'âges différents au même moment, et non l'évolution du salaire d'une même personne. Les plus âgés appartiennent aussi à une autre génération (études et marché du travail différents), ce qui peut jouer sur les écarts observés.
+- **Effectifs faibles et valeurs extrêmes :** la classe des plus de 65 ans ne compte que 20 personnes, et quelques salaires très élevés (jusqu'à 99 $) influencent les moyennes. Les résultats de cette classe sont peu fiables.
