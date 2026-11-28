@@ -835,3 +835,284 @@ Un boxplot résume la distribution par cinq valeurs (minimum, quartiles, médian
 
 **Comment vérifier la sensibilité aux valeurs extrêmes et reproduire tous les graphiques à partir du script ?**
 Pour la sensibilité, on recalcule les indicateurs (moyenne, médiane, écart-type) avec et sans les valeurs extrêmes, sans modifier le jeu de données, et on compare : la médiane change peu, alors que la moyenne et l'écart-type changent davantage. Pour reproduire les graphiques, le script doit s'exécuter de bout en bout, dans l'ordre, à partir du seul fichier `Recensement.txt` placé dans le même dossier. Chaque graphique est produit par une commande du script (`hist`, `boxplot`, `barplot`, `plot`), et le *Knit* complet du fichier .Rmd régénère l'ensemble.
+
+
+# Partie 2 — Régression sur données réelles
+
+```{r}
+library(MASS)         
+data(Boston)
+x <- Boston$lstat      # X : % de population de statut socio-économique bas
+y <- Boston$medv       # Y : valeur médiane des logements occupés (en milliers de $)
+n <- length(x)
+```
+
+# 1. Représenter le nuage de points de Y en fonction de X avec plot(). Décrire la forme générale de la relation observée : sens, intensité apparente et éventuelle non-linéarité.
+
+```{r}
+plot(x, y, xlab = "lstat (%) ", ylab = "medv (en milliers de $)",
+     main = "Nuage de points : valeur médiane des logements vs % population bas",
+     col = "steelblue", pch = 19)
+```
+
+Le nuage est décroissant : quand lstat augmente, medv diminue. Il est plus étiré que linéaire : la baisse est forte pour lstat faible, plus lente ensuite.
+Un alignement de points à medv = 50 (16 quartiers) apparaît en haut. La valeur semble plafonnée (valeur censurée).
+Les données sont anciennes, limitées à une ville, et l'étude reste descriptive, sans lien causal.
+
+ # 2. Estimer la droite des moindres carrés de deux manières : (a) calculer ses coefficients à partir des formules du cours ; (b) utiliser lm() puis summary(). Vérifier que les résultats concordent et tracer la droite sur le nuage de points avec abline(). Interpréter la pente et l’ordonnée à l’origine dans le contexte des données.
+
+```{r}
+# (a) Formules du cours
+cov_xy <- mean((x - mean(x)) * (y - mean(y)))
+var_x  <- mean((x - mean(x))^2)
+a_chap <- cov_xy / var_x
+b_chap <- mean(y) - a_chap * mean(x)
+c(a = a_chap, b = b_chap)
+
+# Vérification : la droite passe par le point moyen (x̄, ȳ)
+c(y_moyen = mean(y), droite_en_x_moyen = a_chap * mean(x) + b_chap)
+
+# (b) Avec lm(),
+modele <- lm(medv ~ lstat, data = Boston)
+coef(modele)
+summary(modele)
+
+# Nuage + droite
+plot(x, y, xlab = "lstat (%)", ylab = "medv (milliers de $)",
+     main = "Droite des moindres carrés de medv en lstat", pch = 19, col = "grey40")
+abline(modele, col = "red", lwd = 2)
+points(mean(x), mean(y), pch = 4, cex = 2, lwd = 3, col = "blue") 
+ ```
+
+
+Les deux méthodes donnent la même droite : $\widehat{medv} = 34,55 - 0,950 \times lstat$.
+
+- **Pente :** quand le pourcentage de population de statut socio-économique bas (lstat) augmente de 1 point, la valeur médiane des logements (medv) diminue en moyenne d'environ 0,95 millier de dollars.
+- **Ordonnée à l'origine :** 34,55 est la valeur médiane prédite pour un quartier où lstat vaudrait 0 %, soit environ 34 550 $. Cette valeur n'est pas observée dans les données (lstat minimum : 1,73 %), donc elle s'interprète avec prudence.
+
+## 3. Calculer le coefficient de corrélation linéaire entre X et Y ainsi que le coefficient de détermination R² du modèle linéaire. Expliquer ce que mesurent ces deux indicateurs et commenter les valeurs obtenues.
+
+```{r}
+# Coefficient de corrélation linéaire 
+r <- cov(x, y) / (sd(x) * sd(y))
+r
+cor(x, y)                      # vérification avec cor()
+
+# Coefficient de détermination 
+R2 <- summary(modele)$r.squared
+R2
+r^2                            
+```
+
+**Le coefficient de corrélation linéaire $r$** mesure le sens et l'intensité de la liaison linéaire entre lstat et medv. Il est compris entre −1 et 1, et plus il est proche de −1 ou 1, plus les points sont proches d'une droite.
+
+**Le coefficient de détermination $R^2$** mesure la part de la variance de medv expliquée par la droite de régression. Dans le cas linéaire, $R^2 = r^2$.
+
+On obtient $r = -0,74$ : la liaison est négative, medv diminue quand lstat augmente, et elle est assez forte. On obtient $R^2 = 0,54$ : la droite explique environ 54 % de la variance de medv, et les 46 % restants ne sont pas expliqués par la relation linéaire avec lstat.
+
+## 4. Effectuer un test de corrélation de Pearson avec cor.test() dans R, au seuil de 5 %. Formuler les hypothèses du test, présenter la statistique et la p-valeur, puis interpréter la conclusion, sans en déduire un lien de causalité.
+
+```{r}
+test_cor <- cor.test(x, y, method = "pearson")
+test_cor
+```
+
+On teste au seuil de 5 % les hypothèses suivantes :
+
+- $H_0$ : la corrélation linéaire entre lstat et medv est nulle ($\rho = 0$) ;
+- $H_1$ : la corrélation linéaire est non nulle ($\rho \neq 0$).
+
+La statistique de test vaut $t = -24,53$ avec 504 degrés de liberté, et la p-valeur est inférieure à $2,2 \times 10^{-16}$. Elle est donc très inférieure à 0,05 : on rejette $H_0$.
+
+Il existe une corrélation linéaire significative, et négative, entre lstat et medv. Ce test montre seulement une association statistique : il ne permet pas de dire que lstat cause la baisse de medv, car d'autres caractéristiques des quartiers peuvent jouer sur les deux variables.
+
+## 5. Obtenir les valeurs ajustées du modèle linéaire avec fitted(). Expliquer ce qu’elles représentent et les comparer aux valeurs observées.
+
+```{r}
+ajustees <- fitted(modele)
+
+
+comparaison <- data.frame(lstat = x, medv_observee = y,
+                          medv_ajustee = round(ajustees, 2))
+knitr::kable(head(comparaison),
+             caption = "Valeurs observées et ajustées de medv (6 premiers quartiers)")
+
+
+c(moyenne_observee = mean(y), moyenne_ajustee = mean(ajustees))
+```
+
+**Valeurs ajustées**
+
+Ce sont les valeurs de medv données par la droite de régression pour chaque quartier : $\hat y_i = \hat a \, x_i + \hat b$. Elles représentent la valeur médiane des logements que le modèle associe au pourcentage lstat du quartier.
+
+**Comparaison avec les valeurs observées**
+
+- Certaines valeurs ajustées sont proches des valeurs observées (29,60 contre 28,7 pour le 6ᵉ quartier).
+- D'autres en sont assez éloignées (29,49 contre 36,2 pour le 5ᵉ quartier).
+- Les deux séries ont la même moyenne (22,53).
+
+La droite ne reproduit donc pas chaque valeur observée, elle donne une tendance moyenne.
+
+## 6. Calculer les résidus du modèle et leur écart-type empirique avec sd(residuals(modele)). Représenter leur histogramme, leur boîte à moustaches et leur nuage de points en fonction de X ; ajouter sur ce dernier les lignes horizontales correspondant à ± deux fois cet écart-type empirique. Distinguer cette quantité de sigma(modele), estimation usuelle de l’écart-type des erreurs. Que révèlent ces graphiques sur la qualité de l’ajustement ?
+
+```{r}
+res <- residuals(modele)          # résidus : medv observée - medv ajustée
+sd_res <- sd(res)                 # écart-type empirique des résidus (divise par n - 1)
+sd_res
+sigma(modele)                     # écart-type des erreurs estimé par lm (divise par n - 2)
+
+par(mfrow = c(1, 2))
+hist(res, main = "Histogramme des résidus", xlab = "Résidus")
+boxplot(res, main = "Boîte à moustaches des résidus", ylab = "Résidus")
+par(mfrow = c(1, 1))
+
+plot(x, res, pch = 19, col = "grey40", xlab = "lstat (%)", ylab = "Résidus",
+     main = "Résidus en fonction de lstat")
+abline(h = 0, col = "red")
+abline(h = c(-2, 2) * sd_res, col = "blue", lty = 2)
+
+sum(abs(res) > 2 * sd_res)
+
+residus_positifs <- sum(res > 2 * sd_res)
+residus_negatifs <- sum(res < -2 * sd_res)
+c(residus_positifs = residus_positifs, residus_negatifs = residus_negatifs)
+```
+
+**Écart-type des résidus et sigma(modele)**
+
+- `sd(residuals(modele))` vaut 6,21 : c'est l'écart-type empirique des résidus, calculé en divisant par $n-1$. Il décrit la dispersion des résidus observés.
+- `sigma(modele)` vaut 6,22 : c'est l'estimation de l'écart-type des erreurs du modèle, calculée en divisant par $n-2$ car deux paramètres ($\hat a$ et $\hat b$) ont été estimés.
+- Les deux valeurs sont très proches ici car $n = 506$ est grand.
+
+**Ce que montrent les graphiques**
+
+- L'histogramme et la boîte à moustaches sont asymétriques : les grands résidus, c'est-à-dire ceux qui dépassent deux écarts-types, sont presque tous positifs (30 au-dessus de $+2 \times 6,21$ contre un seul en dessous de $-2 \times 6,21$).
+- Ces 31 quartiers situés hors des bandes sont mal expliqués par la droite : leur valeur est presque toujours sous-estimée.
+- Les résidus ne sont pas répartis au hasard autour de 0 : ils sont surtout positifs pour les faibles et les fortes valeurs de lstat, et négatifs entre les deux.
+
+L'ajustement linéaire est donc imparfait : il reste dans les résidus une forme courbe que la droite ne prend pas en compte.
+
+## 7. Choisir une nouvelle valeur de X et prévoir la valeur correspondante de Y à l’aide de predict(). Indiquer la valeur choisie, la prévision obtenue et la manière de l’interpréter.
+
+```{r}
+
+nouveau <- data.frame(lstat = 20)
+predict(modele, newdata = nouveau)
+a_chap * 20 + b_chap
+```
+
+**Valeur choisie et prévision**
+
+On choisit lstat = 20 %. La droite de régression prévoit $\hat y = \hat a \times 20 + \hat b = 15,55$, soit une valeur médiane des logements d'environ 15 550 dollars.
+
+**Interprétation**
+
+C'est la valeur moyenne que la droite associe à un quartier où 20 % de la population a un statut socio-économique bas, pas une valeur exacte : la valeur réelle d'un tel quartier peut s'en écarter (écart-type des résidus de 6,21). La valeur 20 est comprise dans l'intervalle observé de lstat (1,73 à 37,97), donc la prévision a un sens ; elle n'en aurait pas pour une valeur éloignée des données.
+
+## 8. Construire un régressogramme : (a) découper X avec cut() en six classes : X ≤ 5 ; 5 < X ≤ 10 ; 10 < X ≤ 15 ; 15 < X ≤ 20 ; 20 < X ≤ 25 ; X > 25 ; (b) calculer la moyenne de Y dans chaque classe ; (c) représenter ces moyennes par une fonction constante par morceaux. Construire aussi une courbe reliant les moyennes des classes aux abscisses représentatives choisies, en justifiant ce choix pour les deux classes extrêmes non bornées. Comparer ces représentations à la droite de régression.
+
+```{r}
+
+# (a) Découpage de lstat en 6 classes
+classes <- cut(x, breaks = c(0, 5, 10, 15, 20, 25, Inf))
+table(classes)
+
+# (b) Moyenne de medv dans chaque classe
+moy_y <- tapply(y, classes, mean)
+
+# Abscisses choisies : moyenne de lstat dans chaque classe
+moy_x <- tapply(x, classes, mean)
+
+# Valeur de la droite de régression en ces abscisses (pour comparer)
+droite <- predict(modele, newdata = data.frame(lstat = moy_x))
+
+knitr::kable(data.frame(Effectif = as.vector(table(classes)),
+                        Moy_lstat = round(moy_x, 2),
+                        Moy_medv = round(moy_y, 2),
+                        Droite = round(droite, 2)),
+             caption = "Régressogramme : moyenne de medv par classe de lstat")
+
+# (c) Fonction constante par morceaux + courbe des moyennes + droite
+plot(x, y, pch = 19, col = "grey70", xlab = "lstat (%)", ylab = "medv (milliers de $)",
+     main = "Régressogramme et droite de régression")
+bornes <- c(min(x), 5, 10, 15, 20, 25, max(x))
+segments(bornes[-7], moy_y, bornes[-1], moy_y, col = "blue", lwd = 3)
+lines(moy_x, moy_y, type = "b", pch = 19, col = "darkgreen", lwd = 2)
+abline(modele, col = "red", lwd = 2)
+legend("topright", legend = c("Moyennes par classe", "Courbe des moyennes", "Droite de régression"),
+       col = c("blue", "darkgreen", "red"), lwd = 2)
+```
+
+**Choix des abscisses**
+
+Chaque moyenne de medv est placée à la moyenne de lstat des quartiers de la classe. Pour les classes intérieures, cette valeur est proche du centre de la classe. Pour les deux classes extrêmes (lstat ≤ 5 et lstat > 25), il n'y a pas de centre car elles ne sont pas bornées : la moyenne de lstat dans la classe (3,85 et 29,65) évite de fixer une borne arbitraire et place le point là où se trouvent réellement les quartiers.
+
+**Comparaison avec la droite de régression**
+
+- Les moyennes de medv diminuent de 37,79 à 11,81 quand lstat augmente : on retrouve la tendance décroissante de la droite.
+- Au centre, la droite est proche des moyennes de classe (22,69 contre 20,63 pour la classe ]10,15]).
+- Aux extrémités, elle s'en écarte nettement : elle sous-estime la moyenne pour lstat ≤ 5 (30,90 contre 37,79) et pour lstat > 25 (6,39 contre 11,81).
+
+Le régressogramme montre donc une relation courbe : forte baisse de medv pour les faibles valeurs de lstat, puis baisse plus lente. La droite ne capte pas cette forme, ce qui confirme ce qu'on a vu sur les résidus.
+
+## 9. Ajuster des modèles polynomiaux de degrés 2, 3 et 4 pour expliquer Y par X. Pour chaque modèle, obtenir le R² avec summary(), tracer la courbe ajustée sur le nuage de points et commenter l’évolution de l’ajustement. Expliquer pourquoi un R² plus élevé sur les données d’ajustement ne garantit pas une meilleure prévision.
+
+```{r}
+# Modèle polynomial de degré 2
+modele2 <- lm(medv ~ poly(lstat, 2), data = Boston)
+summary(modele2)
+plot(x, y, xlab = "lstat (%)", ylab = "medv (milliers de $)",
+     main = "Modèle polynomial de degré 2", pch = 19, col = "grey40")
+ajustees2 <- fitted(modele2)
+lines(sort(x), ajustees2[order(x)], col = "red", lwd = 2)
+
+# Modèle polynomial de degré 3
+modele3 <- lm(medv ~ poly(lstat, 3), data = Boston)
+summary(modele3)
+plot(x, y, xlab = "lstat (%)", ylab = "medv (milliers de $)",
+     main = "Modèle polynomial de degré 3", pch = 19, col = "grey40")
+ajustees3 <- fitted(modele3)
+lines(sort(x), ajustees3[order(x)], col = "red", lwd = 2)
+
+# Modèle polynomial de degré 4
+modele4 <- lm(medv ~ poly(lstat, 4), data = Boston)
+summary(modele4)
+plot(x, y, xlab = "lstat (%)", ylab = "medv (milliers de $)",
+     main = "Modèle polynomial de degré 4", pch = 19, col = "grey40")
+ajustees4 <- fitted(modele4)
+lines(sort(x), ajustees4[order(x)], col = "red", lwd = 2)
+
+c(R2_deg1 = summary(modele)$r.squared,
+  R2_deg2 = summary(modele2)$r.squared,
+  R2_deg3 = summary(modele3)$r.squared,
+  R2_deg4 = summary(modele4)$r.squared)
+```
+
+**Évolution de l'ajustement**
+
+Le $R^2$ augmente avec le degré et les courbes suivent de mieux en mieux la forme courbe du nuage. Le gain est important entre la droite et le degré 2, puis faible pour les degrés 3 et 4, dont les courbes sont proches de celle du degré 2.
+
+**Pourquoi un $R^2$ plus élevé ne garantit pas une meilleure prévision**
+
+Le $R^2$ est calculé sur les données qui ont servi à ajuster le modèle, et il augmente toujours quand on ajoute un degré. Un polynôme de degré élevé peut donc coller aux particularités de cet échantillon plutôt qu'à la tendance générale, et moins bien prévoir medv pour de nouveaux quartiers, surtout aux extrémités de lstat.
+
+## 10. Calculer avec AIC() le critère AIC du modèle linéaire et de chacun des modèles polynomiaux étudiés. Comparer les valeurs obtenues en tenant compte également de la qualité de l’ajustement, des graphiques et de la complexité des modèles ; justifier votre choix sans considérer le plus petit AIC comme un critère suffisant à lui seul.
+
+```{r}
+c(AIC_deg1 = AIC(modele),
+  AIC_deg2 = AIC(modele2),
+  AIC_deg3 = AIC(modele3),
+  AIC_deg4 = AIC(modele4))
+```
+
+**Comparaison des AIC**
+
+L'AIC diminue à chaque degré : il baisse fortement entre le degré 1 et le degré 2 (−118), puis beaucoup moins aux degrés 3 et 4 (environ −21 à chaque fois). Le plus petit AIC est celui du degré 4.
+
+**Choix du modèle**
+
+- **Qualité de l'ajustement :** le $R^2$ passe de 0,544 à 0,641 avec le degré 2, puis n'augmente plus que faiblement (0,658 puis 0,673).
+- **Graphiques :** le degré 2 capte déjà la forme courbe du nuage, et les courbes des degrés 3 et 4 en sont proches.
+- **Complexité :** chaque degré ajoute un paramètre, ce qui rend le modèle plus difficile à interpréter et augmente le risque de coller aux particularités de l'échantillon.
+
+On retient donc le modèle de degré 2 : il apporte l'essentiel de l'amélioration par rapport à la droite avec un seul paramètre en plus. Le degré 4 a le plus petit AIC, mais son gain sur le $R^2$ et sur les graphiques est faible par rapport à sa complexité supplémentaire.
